@@ -1,112 +1,37 @@
 # Initialize environment --------------------------------------------------
-library(dplyr)
-library("readxl")
-library(ggplot2)
-library(ggthemes)
-library(tidyverse)
-require(scales)
-source("sum_stat.R")
-
 rm(list=ls())
 
-path<-"/Users/Dominik/OneDrive - Central European University/2nd_trimester/DDM/ddm_kiosk/"
+library(tidyverse)
+library(readxl)
+library(janitor)
 
-# Read in data ------------------------------------------------------------
-read_excel_allsheets <- function(filename) {
-  sheets <- excel_sheets(filename)
-  for (sheet in sheets){
-    df <- read_excel(filename, sheet = sheet)
-    name <- tolower(gsub(" ", "_", sheet))
-    assign(name, df, pos=1)
-  }
-}
+# read data
+fname <- 'Czech newspaperkiosk case dataset 20210104_v1.0.xlsx'
+turnover <- readxl::read_excel(fname, sheet = 'Turnover') %>% janitor::clean_names() %>% mutate(store_name = as.factor(store_name))
+store <- readxl::read_excel(fname, sheet = 'Store data') %>% janitor::clean_names() 
+costs <- readxl::read_excel(fname, sheet = 'Costs') %>% janitor::clean_names()
 
-read_excel_allsheets(paste0(path, "data/Czech newspaperkiosk case dataset 20210104_v1.0.xlsx"))
 
-rm(description)
-
-# convert nominal variables to factors
-store_data$Prague<-as.factor(store_data$Prague)
-store_data$`Price category`<- as.factor(store_data$`Price category`)
-store_data$`Lottery POS`<- as.factor(store_data$`Lottery POS`)
-store_data$`PUDO POS`<- as.factor(store_data$`PUDO POS`)
-
-# change sign of costs
-costs$Costs <- -costs$Costs
-
-# Create Year-Store Aggregated Dataset ------------------------------------
-# Aggregate data
-ys_t <- turnover %>% group_by(Year,`Store name`) %>% 
+# AVG performance YoY
+turnover_avg <- turnover %>% 
+  group_by(store_name, product_category, year) %>% 
   summarise(
-    gm = sum(GM)
+    avg_gm = mean(gm)
   )
+ggplot(turnover_avg, aes(year, avg_gm)) + geom_boxplot(position = 'dodge') + facet_grid(scales = 'free', rows = . ~ product_category)
 
-ys_t$`Store name` <- as.character(ys_t$`Store name`)
-
-ys_c <- costs %>% group_by(Year,`Store name`) %>% 
+# AVG Monthly performance by category 
+turnover_mon <- turnover %>% 
+  group_by(year, month, product_category) %>% 
   summarise(
-    cost = sum(Costs)
+    avg_gm = mean(gm)
   )
-
-ys_c$`Store name` <- as.character(ys_c$`Store name`)
-
-# Join cost and turnover
-ys <- left_join(ys_t,ys_c,by=c("Year","Store name"))
-
-# Join df and store data
-ys <- left_join(ys,store_data, by="Store name")
-
-# Calculate net margin
-ys$nm <- ys$gm-ys$cost
-
-# Create Year-Store-ProductCat Aggregated Dataset ------------------------
-ysp_t <- turnover %>% group_by(Year,`Store name`, `Product category`) %>% 
-  summarise(
-    gm = sum(GM)
-  )
-
-ysp_t$`Store name` <- as.character(ysp_t$`Store name`)
-
-ysp <- left_join(ysp_t,store_data,by="Store name")
-
-# EDA ----------------------------------------------------------------------
-
-str(store_data)
-
-store_data %>%
-  keep(is.numeric) %>% 
-  gather() %>% 
-  ggplot(aes(value)) +
-  facet_wrap(~key, scales = "free") +
-  geom_histogram()+
-  theme_bw() + 
-  scale_fill_wsj()
-
-dstats<-sum_stat(store_data, store_data %>%
-           keep(is.numeric) %>% 
-           colnames(),
-         c('mean','median','min','max','1st_qu.','3rd_qu','sd','range'),
-         num_obs = F
-         )
-
-ysp %>%
-  select(gm) %>% 
-  keep(is.numeric) %>% 
-  gather() %>% 
-  ggplot(aes(value)) +
-  facet_wrap(~key, scales = "free") +
-  geom_histogram()+
-  theme_bw() + 
-  scale_fill_wsj()
-
-ys %>%
-  select(c(gm,cost,nm)) %>% 
-  keep(is.numeric) %>% 
-  gather() %>% 
-  ggplot(aes(value)) +
-  facet_wrap(~key, scales = "free") +
-  geom_histogram()+
-  theme_bw() + 
-  scale_fill_wsj()
+ggplot(turnover_mon, aes(year, avg_gm)) + geom_boxplot(position = 'dodge') + facet_grid(scales = 'free', rows = vars(product_category), cols = vars(month))
 
 
+# join all tables together for modelling
+df <- turnover %>% 
+  left_join(costs, by = c('store_name', 'year')) %>% 
+  left_join(store, by = c('store_name'))
+
+glimpse(df)
