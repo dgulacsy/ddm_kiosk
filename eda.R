@@ -34,4 +34,20 @@ df <- turnover %>%
   left_join(costs, by = c('store_name', 'year')) %>% 
   left_join(store, by = c('store_name'))
 
-glimpse(df)
+
+# Shops that are underperformers ------------------------------------------
+
+
+
+
+# gambling ----------------------------------------------------------------
+
+
+
+# seasonality -------------------------------------------------------------
+
+
+
+# sales performance factors per product category --------------------------
+
+
