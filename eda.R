@@ -11,7 +11,6 @@ turnover <- readxl::read_excel(fname, sheet = 'Turnover') %>% janitor::clean_nam
 store <- readxl::read_excel(fname, sheet = 'Store data') %>% janitor::clean_names() 
 costs <- readxl::read_excel(fname, sheet = 'Costs') %>% janitor::clean_names()
 
-
 # AVG performance YoY
 turnover_avg <- turnover %>% 
   group_by(store_name, product_category, year) %>% 
@@ -32,8 +31,8 @@ ggplot(turnover_mon, aes(year, avg_gm)) + geom_boxplot(position = 'dodge') + fac
 # join all tables together for modelling
 df <- turnover %>% 
   left_join(costs, by = c('store_name', 'year')) %>% 
-  left_join(store, by = c('store_name'))
-
+  left_join(store, by = c('store_name')) %>% 
+  mutate(year = fct_recode(as.factor(year), "0" = "Last year", "1" = "This year"))
 
 # calculate NM ( = GM - NCOGS)
 df <- df %>% 
@@ -59,8 +58,8 @@ nm_avg_1 <- as.numeric(nm_avg_y[2, 2])
 
 df_up <- df %>% 
   mutate(
-    underperformer_0 = ifelse(year == "Last year" & nm < nm_avg_0, 1, ifelse(year == "This year", NA, 0)),
-    underperformer_1 = ifelse(year == "This year" & nm < nm_avg_1, 1, ifelse(year == "Last year", NA, 0))
+    underperformer_0 = ifelse(year == 0 & nm < nm_avg_0, 1, ifelse(year == 1, NA, 0)),
+    underperformer_1 = ifelse(year == 1 & nm < nm_avg_1, 1, ifelse(year == 0, NA, 0))
   )
 
 df_up %>% 
@@ -74,8 +73,32 @@ df_up %>%
 
 df %>% ggplot(aes(nm)) + geom_histogram(bins = 50)
 # gambling ----------------------------------------------------------------
+df_g <- df %>% 
+  group_by(store_name, product_category, year) %>% 
+  summarise(
+    total_gm_cat = sum(gm)
+  ) %>% 
+  right_join(df, by = c("store_name", "product_category", "year"))
+df_g <- df_g %>% 
+  group_by(store_name, year) %>% 
+  summarise(
+    total_gm = sum(gm)
+  ) %>% 
+  right_join(df_g, by = c("store_name", "year"))
 
 
+df_g <- df_g %>% 
+  group_by(store_name, year, product_category) %>% 
+  summarise(
+    total_gm_cat_perc = total_gm_cat / total_gm * 100
+  ) %>% 
+  right_join(df_g, by = c("store_name", "year", "product_category"))
+
+prod_cat_becnh <- df_g %>% 
+  group_by(year, product_category) %>% 
+  summarise(
+    avg_perc_gm = mean(total_gm_cat_perc)
+  ) 
 
 # seasonality -------------------------------------------------------------
 
