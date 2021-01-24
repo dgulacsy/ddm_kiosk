@@ -1,0 +1,32 @@
+{
+    "id": "C89EC860",
+    "path": null,
+    "project_path": null,
+    "type": "r_dataframe",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1611407524051.0,
+    "source_on_save": false,
+    "relative_order": 3,
+    "properties": {
+        "expression": "turnover",
+        "caption": "turnover",
+        "totalObservations": "17965",
+        "displayedObservations": "17965",
+        "variables": "5",
+        "cacheKey": "620BDF1A",
+        "object": "turnover",
+        "environment": "",
+        "contentUrl": "grid_resource/gridviewer.html?env=&obj=turnover&cache_key=620BDF1A&max_cols=50",
+        "preview": "0"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 21955361722073200,
+    "encoding": "",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1611407524051,
+    "read_only": false,
+    "read_only_alternatives": []
+}

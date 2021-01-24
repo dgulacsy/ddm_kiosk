@@ -1,0 +1,62 @@
+# Initialize environment --------------------------------------------------
+library(dplyr)
+library("readxl")
+library(ggplot2)
+library(ggthemes)
+library(tidyverse)
+require(scales)
+source("sum_stat.R")
+
+rm(list=ls())
+
+path<-"/Users/Dominik/OneDrive - Central European University/2nd_trimester/DDM/ddm_kiosk/"
+
+# Read in data ------------------------------------------------------------
+read_excel_allsheets <- function(filename) {
+  sheets <- excel_sheets(filename)
+  for (sheet in sheets){
+    df <- read_excel(filename, sheet = sheet)
+    name <- tolower(gsub(" ", "_", sheet))
+    assign(name, df, pos=1)
+  }
+}
+
+read_excel_allsheets(paste0(path, "data/Czech newspaperkiosk case dataset 20210104_v1.0.xlsx"))
+
+rm(description)
+
+# Aggregate data
+agg_t <- turnover %>% group_by(Year,`Store name`) %>% 
+  summarise(
+    gm = sum(GM)
+  )
+
+agg_c <- costs %>% group_by(Year,`Store name`) %>% 
+  summarise(
+    gm = sum(Costs)
+  )
+
+# EDA ----------------------------------------------------------------------
+
+str(store_data)
+store_data$Prague<-as.factor(store_data$Prague)
+store_data$`Price category`<- as.factor(store_data$`Price category`)
+store_data$`Lottery POS`<- as.factor(store_data$`Lottery POS`)
+store_data$`PUDO POS`<- as.factor(store_data$`PUDO POS`)
+
+store_data %>%
+  keep(is.numeric) %>% 
+  gather() %>% 
+  ggplot(aes(value)) +
+  facet_wrap(~key, scales = "free") +
+  geom_histogram()+
+  theme_bw() + 
+  scale_fill_wsj()
+
+dstats<-sum_stat(store_data, store_data %>%
+           keep(is.numeric) %>% 
+           colnames(),
+         c('mean','median','min','max','1st_qu.','3rd_qu','sd','range'),
+         num_obs = F
+         )
+

@@ -1,0 +1,32 @@
+{
+    "id": "B81DBAC5",
+    "path": null,
+    "project_path": null,
+    "type": "r_dataframe",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1611426013161.0,
+    "source_on_save": false,
+    "relative_order": 7,
+    "properties": {
+        "expression": "dstats",
+        "caption": "dstats",
+        "totalObservations": "8",
+        "displayedObservations": "8",
+        "variables": "12",
+        "cacheKey": "68602431",
+        "object": "dstats",
+        "environment": "",
+        "contentUrl": "grid_resource/gridviewer.html?env=&obj=dstats&cache_key=68602431&max_cols=50",
+        "preview": "0"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 15481347060924483,
+    "encoding": "",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1611426013161,
+    "read_only": false,
+    "read_only_alternatives": []
+}
