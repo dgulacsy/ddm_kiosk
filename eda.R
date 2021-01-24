@@ -9,7 +9,7 @@ library(janitor)
 fname <- 'data/Czech newspaperkiosk case dataset 20210104_v1.0.xlsx'
 turnover <- readxl::read_excel(fname, sheet = 'Turnover') %>% janitor::clean_names() %>% mutate(store_name = as.factor(store_name))
 store <- readxl::read_excel(fname, sheet = 'Store data') %>% janitor::clean_names() 
-costs <- readxl::read_excel(fname, sheet = 'Costs') %>% janitor::clean_names()
+costs <- readxl::read_excel(fname, sheet = 'Costs') %>% janitor::clean_names() %>% mutate(costs = -costs)
 
 # AVG performance YoY
 turnover_avg <- turnover %>% 
@@ -34,7 +34,7 @@ df <- turnover %>%
   left_join(store, by = c('store_name')) %>% 
   mutate(year = fct_recode(as.factor(year), "0" = "Last year", "1" = "This year"))
 
-# calculate NM ( = GM - NCOGS)
+# calculate NM ( = GM + NCOGS)
 df <- df %>% 
   group_by(year, store_name) %>% 
   summarise(
@@ -46,7 +46,7 @@ df <- df %>%
   )
 
 # Shops that are underperformers ------------------------------------------
-
+# create yearly aggregated average net-margin variable
 nm_avg_y <- df %>% 
   group_by(year) %>% 
   summarise(
@@ -56,6 +56,7 @@ nm_avg_y <- df %>%
 nm_avg_0 <- as.numeric(nm_avg_y[1, 2])
 nm_avg_1 <- as.numeric(nm_avg_y[2, 2])
 
+# filter based on yearly nm 
 df_up <- df %>% 
   mutate(
     underperformer_0 = ifelse(year == 0 & nm < nm_avg_0, 1, ifelse(year == 1, NA, 0)),
@@ -71,8 +72,17 @@ df_up %>%
     perc_total_1 = underperformers_this_year / total * 100
   )
 
-df %>% ggplot(aes(nm)) + geom_histogram(bins = 50)
+# histogram of nm and gm
+df_hist <- df %>% group_by(year, store_name) %>% summarise(gm = mean(gm), nm = mean(nm), costs = mean(costs))
+
+df_hist %>% ggplot(aes(nm)) + geom_histogram(bins = 50)
+df_hist %>% ggplot(aes(gm)) + geom_histogram(bins = 50)
+
+# scatter plot of costs ~ nm/gm
+df_hist %>% ggplot(aes(nm, costs)) + geom_point()
+df_hist %>% ggplot(aes(gm, costs)) + geom_point()
 # gambling ----------------------------------------------------------------
+# create total gross-margin and total gross-margin per category
 df_g <- df %>% 
   group_by(store_name, product_category, year) %>% 
   summarise(
@@ -86,7 +96,7 @@ df_g <- df_g %>%
   ) %>% 
   right_join(df_g, by = c("store_name", "year"))
 
-
+# calculate percentage of total gross margin per category
 df_g <- df_g %>% 
   group_by(store_name, year, product_category) %>% 
   summarise(
@@ -94,11 +104,29 @@ df_g <- df_g %>%
   ) %>% 
   right_join(df_g, by = c("store_name", "year", "product_category"))
 
+# create average perc of total gm per category per year
 prod_cat_becnh <- df_g %>% 
   group_by(year, product_category) %>% 
   summarise(
     avg_perc_gm = mean(total_gm_cat_perc)
   ) 
+
+# count number of high impact gambling stores per year
+df_g %>% 
+  filter(product_category == "Sazka") %>% 
+  mutate(gambling_high_imp = ifelse(total_gm_cat_perc > 25, 1, 0)) %>% 
+  group_by(store_name, year) %>% 
+  summarise(
+    gambl_hi_count = mean(gambling_high_imp)
+  ) %>% 
+  group_by(year) %>% 
+  summarise(
+    total_hi_gamb = sum(gambl_hi_count)
+  )
+
+# create high impact gambling dummy
+df_g <- df_g %>% 
+  mutate(gamb_hi_imp = ifelse(product_category == "Sazka" & total_gm_cat_perc > 25, 1, ifelse(product_category != "Sazka", NA, 0))) 
 
 # seasonality -------------------------------------------------------------
 
