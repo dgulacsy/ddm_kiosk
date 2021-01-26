@@ -4,6 +4,7 @@ library("readxl")
 library(ggplot2)
 library(ggthemes)
 library(tidyverse)
+library(janitor)
 require(scales)
 source("sum_stat.R")
 
