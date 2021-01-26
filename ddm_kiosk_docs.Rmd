@@ -11,11 +11,11 @@ abstract: |
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
 ```
 
 ```{r, results='hide', message=FALSE, warning=FALSE}
-# Initialize environment
+# Initialize environment --------------------------------------------------
 library(dplyr)
 library(readxl)
 library(ggplot2)
@@ -28,25 +28,323 @@ source("sum_stat.R")
 
 rm(list=ls())
 
-f<-"https://github.com/dgulacsy/ddm_kiosk/blob/main/data/Czech%20newspaperkiosk%20case%20dataset%2020210104_v1.0.xlsx?raw=true"
+url<-"https://raw.githubusercontent.com/dgulacsy/ddm_kiosk/main/data/clean/"
 ```
 
 ```{r}
-turnover <- read_excel(f, sheet = 'Turnover') %>% clean_names() %>% mutate(store_name = as.factor(store_name))
-store <- read_xlsx(f, sheet = 'Store data') %>% clean_names() 
-costs <- read_xlsx(f, sheet = 'Costs') %>% clean_names() %>% mutate(costs = -costs)
+# Create sum_stat function
+sum_stat <- function( df , var_names , stats , num_obs = TRUE ){
+  k <- length( var_names )
+  built_in_stat <- c('mean','median','mode','min','max','1st_qu.','3rd_qu',
+                     'sd','var','range','iqr')
+  do_stat <- intersect( stats , built_in_stat )
+  if ( is_empty(do_stat) ){
+    stop('Error, no such statistics is implemented! Choose from: mean,median,min,max,1st_qu.,3rd_qu')
+  }
+  # By default add the number of missing observations and the number of used observations
+  m <- length( do_stat )
+  if ( num_obs ){
+    do_stat <- c( do_stat , "# missing", "# used obs")
+  }
+  # Create tibble for output
+  sum_stat <- as_tibble( matrix( 0 , nrow = m , ncol = k ) , name_repair = "unique" )
+  for ( j in 1 : k ) {
+    # Get the data for the j'th variable
+    var_j <- df[ var_names[ j ] ]
+    if ( num_obs ){
+      # Count the missing values and add to statistics
+      sum_stat[ m + 1 , j ] <- as.integer( sum( is.na( var_j ) ) )
+      # Count observations used
+      sum_stat[ m + 2 , j ] <- as.integer( sum( !is.na( var_j ) ) )
+    }
+    # Remove missing values
+    var_j <- var_j[ !is.na( var_j ) ]
+    # Name the sum_stat's column
+    colnames( sum_stat )[ j ] <- var_names[ j ]
+    for ( i in 1 : m ) {
+      # Central tendency
+      if (do_stat[ i ] == "mean"){
+        sum_stat[[i,j]] <- mean( var_j )
+      } else if (do_stat[ i ] == "median"){
+        sum_stat[i,j] <- median( var_j )
+      } else if (do_stat[ i ] == "mode"){
+        sum_stat[i,j] <- mode( var_j )
+      } 
+      # Support
+      else if (do_stat[ i ] == "min"){
+        sum_stat[i,j] <- min( var_j )
+      } else if (do_stat[ i ] == "max"){
+        sum_stat[i,j] <- max( var_j )
+      } 
+      # Quartiles
+      else if (do_stat[ i ] == "1st_qu."){
+        sum_stat[i,j] <- quantile( var_j , probs = 0.25 )
+      } else if (do_stat[ i ] == "3rd_qu"){
+        sum_stat[i,j] <- quantile( var_j , probs = 0.75)
+      } 
+      # Dispersion
+      else if (do_stat[ i ] == "sd"){
+        sum_stat[i,j] <- sd( var_j )
+      } else if (do_stat[ i ] == "var"){
+        sum_stat[i,j] <- var( var_j )
+      } else if (do_stat[ i ] == "range"){
+        sum_stat[i,j] <- max( var_j ) - min( var_j )
+      } else if (do_stat[ i ] == "iqr"){
+        sum_stat[i,j] <- quantile( var_j , probs = 0.75) - quantile( var_j , probs = 0.25)
+      } 
+    }
+  }
+  # Finally add a column which contains the requested statistics and relocate to first position
+  sum_stat <- sum_stat %>% 
+    mutate( statistics = do_stat ) %>% 
+    relocate( statistics )
+  
+  return( sum_stat )
+}
 ```
 
-## R Markdown
+```{r}
+# Read in data ------------------------------------------------------------
+turnover <- read_csv(paste0(url,"turnover.csv"))
+stores <- read_csv(paste0(url,"stores.csv"))
+cost <- read_csv(paste0(url,"cost.csv"))
+```
+
+# Data Cleaning and Wrangling
+We 
+
+```{r, results='hide'}
+# Data cleaning -----------------------------------------------------------
+str(stores)
+str(turnover)
+str(cost)
+
+# convert store_name column to string
+turnover$store_name <- as.character(turnover$store_name)
+cost$store_name <- as.character(cost$store_name)
+stores$store_name <- as.character(stores$store_name)
+
+# convert nominal variables to factors
+stores$prague<-as.factor(stores$prague)
+stores$price_category<- as.factor(stores$price_category)
+stores$lottery_pos<- as.factor(stores$lottery_pos)
+stores$pudo_pos<- as.factor(stores$pudo_pos)
+
+# convert numeric variables stored as character to numeric
+stores$sunday_opening_hours <- as.numeric(stores$sunday_opening_hours)
+stores$real_estate_price_sqm <- as.numeric(stores$real_estate_price_sqm)
+stores$x0_50m_avg <- as.numeric(stores$x0_50m_avg)
+stores$x50_100m_avg <- as.numeric(stores$x50_100m_avg)
+stores$x100_plusm_avg <- as.numeric(stores$x100_plusm_avg)
+stores$newspaper_shelves <- as.numeric(stores$newspaper_shelves)
+stores$non_newspaper_shelves <- as.numeric(stores$non_newspaper_shelves)
+
+# replace #missing values with NA
+stores[stores == "#MISSING"] <- NA
+
+# change sign of costs
+cost$costs <- -cost$costs
+
+# change unit of measurement for gm, cost
+cost$costs <- cost$costs/10^5
+turnover$gm <- turnover$gm/10^5
+```
+
+```{r}
+# Create Year-Store Aggregated Dataset ------------------------------------
+# Aggregate data
+ys_t <- turnover %>% group_by(year,store_name) %>% 
+  summarise(
+    gm = sum(gm)
+  )
+
+# Join cost and turnover
+ys <- left_join(ys_t,cost,by=c("year","store_name"))
+
+# Join df and store data
+ys <- left_join(ys,stores, by="store_name")
+
+# Calculate net margin (Net margin = Gross margin - Non-COGS costs)
+ys$nm <- ys$gm-ys$costs
+
+# Create Year-Store-ProductCat Aggregated Dataset ------------------------
+ysp_t <- turnover %>% group_by(year,store_name, product_category) %>% 
+  summarise(
+    gm = sum(gm)
+  )
+
+ysp <- left_join(ysp_t,stores,by="store_name")
+
+# Create Year-Store-ProductCat-Month level Dataset ------------------------
+yspm <- left_join(turnover, stores, by="store_name")
+
+```
+
+# General Descriptive Statistics and Exploratory Data Analysis
+
+```{r}
+# General EDA ----------------------------------------------------------------------
+
+stores %>%
+  keep(is.numeric) %>% 
+  gather() %>% 
+  ggplot(aes(value)) +
+  facet_wrap(~key, scales = "free") +
+  geom_histogram()+
+  theme_bw() + 
+  scale_fill_wsj()
+
+# Descriptive statistics
+dstats<-sum_stat(stores, stores %>%
+           keep(is.numeric) %>% 
+           colnames(),
+         c('mean','median','min','max','1st_qu.','3rd_qu','sd','range'),
+         num_obs = F
+         ) %>% 
+        left_join(sum_stat(turnover,
+                           c("gm"),
+                           c('mean','median','min','max','1st_qu.','3rd_qu','sd','range'),
+                           num_obs = F),
+                  by="statistics") %>%
+        left_join(sum_stat(cost,
+                           c("costs"),
+                           c('mean','median','min','max','1st_qu.','3rd_qu','sd','range'),
+                           num_obs = F),
+                  by="statistics")
+
+# Distributions of GM by product categories and years
+ggplot(ysp_t, aes(gm)) + geom_histogram(position = 'dodge') + facet_grid(year ~ product_category,scales = 'free')
+
+# Distributions of GM by year
+ggplot(ys, aes(gm)) + geom_histogram(position = 'dodge') + facet_grid(scales = 'free', rows = . ~ year)
+
+# Distributions of Non-COGS Costs by years
+ggplot(cost, aes(costs)) + geom_histogram(position = 'dodge') + facet_grid(scales = 'free', rows = . ~ year)
+
+# Cost - Gross Margin Scatterplot
+suspicous <- subset(ys, costs<0)
+
+ggplot(ys , aes(x = costs, y = gm)) +
+  geom_point() +
+  theme_bw() +
+  geom_smooth(method="loess" , formula = y ~ x ) +
+  labs( title = "Relationship between Non-COGS Costs and Gross Margin",
+        y = "Gross Margin (100K)",
+        x = "Costs (100K)")+ 
+  facet_grid(scales = 'free', rows = . ~ year)
+```
+
+```{r}
+ys$costs
+```
+
+```{r}
+# Select This year
+ys <- filter(ys, year=="This year")
+ysp <- filter(ysp, year=="This year")
+yspm <- filter(yspm, year=="This year")
+```
+
+# Revenue Improvement Strategies | EDA
+
+<!-- Dominik -->
+
+## 1. Weekend Opening Hours  
+```{r}
+# 1. Weekend Opening Hours ------------------------
+
+ggplot(ys, aes(x = round(sunday_opening_hours,1), y = gm)) +
+  geom_point() +
+  theme_bw() +
+  geom_smooth(method="loess" , formula = y ~ x )+
+  labs( title = "Pattern of association between Gross Margin and Sunday Opening Hours",
+        y = "Gross Margin (100K)",
+        x = "Sunday Opening Hours")
+
+# Create Sunday open dummy variable
+ys$sunday_open<-as.factor(ifelse(ys$sunday_opening_hours>0,1,0))
+yspm$sunday_open<-as.factor(ifelse(yspm$sunday_opening_hours>0,1,0))
+
+gm_s <- ys %>% group_by(sunday_open) %>% 
+  summarise(
+    avg_gm = mean(gm)
+  )
+
+ggplot(gm_s, aes(fill=sunday_open, y=avg_gm, x=sunday_open)) + 
+  geom_bar(position="dodge", stat="identity")
+
+gm_mps<- yspm %>% group_by(product_category,month,sunday_open) %>% 
+  summarise(
+    avg_gm = mean(gm)
+  )
+
+ggplot(gm_mps, aes(fill=sunday_open, y=avg_gm, x=sunday_open)) + 
+  geom_bar(position="dodge", stat="identity") + 
+  facet_grid(product_category ~ month,scales = 'free')
+```
+
+## 2. Potential benefits of the abolition of PUDO Services  
+```{r}
+# 2. Potential benefits of the abolition of PUDO Services -----------------------------------------------------------
+gm_p<- yspm %>% group_by(product_category,month) %>% 
+  summarise(
+    avg_gm = mean(gm)
+  )
+
+ggplot(gm_p, aes(fill=product_category, y=avg_gm, x=product_category)) + 
+  geom_bar(position="dodge", stat="identity") + 
+  facet_grid(product_category ~ month,scales = 'free')+
+  theme(axis.text.x=element_blank(),
+        legend.position = "none")
+```
 
 
+## 3. Finding better product combos/mixes  
+```{r}
+# 3. Finding better product combos/mixes --------
+# Calculate newspaper ratio
+ys$npr<- ys$newspaper_shelves/(ys$newspaper_shelves+ys$non_newspaper_shelves)
 
-## Including Plots
+ggplot(ys, aes(x = npr, y = gm)) +
+  geom_point() +
+  theme_bw() +
+  geom_smooth(method="loess" , formula = y ~ x )+
+  labs( title = "Pattern of association between Gross Margin and Newspaper focus ratio",
+        y = "Gross Margin (100K)",
+        x = "Newspaper focus ratio")
 
-You can also embed plots, for example:
+ggplot(ys, aes(x = npr, y = nm)) +
+  geom_point() +
+  theme_bw() +
+  geom_smooth(method="loess" , formula = y ~ x )+
+  labs( title = "Pattern of association between Gross Margin and Newspaper focus ratio",
+        y = "Net Margin (100K)",
+        x = "Newspaper focus ratio")
+```
 
+Preliminary exploratory analysis suggests that using this strategy will not increase revenue generation.
+It seems like there is no strong relationship between the store's newspaper focus and Gross Margin/Net Margin.
+A multiple regression would give a better idea whether there is indeed no pattern of association between the two.
+
+<!-- Ati -->
+
+## 4. 
 ```{r}
 
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+## 5. 
+```{r}
+
+```
+
+## 6. 
+```{r}
+
+```
+
+# Notes
+
+```{r}
+
+```
