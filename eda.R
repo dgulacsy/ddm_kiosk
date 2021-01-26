@@ -104,6 +104,9 @@ df_g <- df_g %>%
   ) %>% 
   right_join(df_g, by = c("store_name", "year", "product_category"))
 
+df_g <- df_g[!duplicated(df_g),]
+
+
 # create average perc of total gm per category per year
 prod_cat_becnh <- df_g %>% 
   group_by(year, product_category) %>% 
