@@ -1,0 +1,52 @@
+---
+title: "Newspaper Kiosk Revenue Increase Strategies"
+subtitle: "Phase 1: Business & Data Understanding"
+author:
+- name: "Dominik Gulacsy"
+- name: "Attila Szuts"
+date: "26/01/2021"
+output: pdf_document
+abstract: |
+  This document detials the process of business and data understanding. It points out data cleaning issues, showcases descriptive and exploratory data analysis, variable transformations and formulates insights gained from them.
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r, results='hide', message=FALSE, warning=FALSE}
+# Initialize environment
+library(dplyr)
+library(readxl)
+library(ggplot2)
+library(ggthemes)
+library(tidyverse)
+library(janitor)
+require(scales)
+
+source("sum_stat.R")
+
+rm(list=ls())
+
+f<-"https://github.com/dgulacsy/ddm_kiosk/blob/main/data/Czech%20newspaperkiosk%20case%20dataset%2020210104_v1.0.xlsx?raw=true"
+```
+
+```{r}
+turnover <- read_excel(f, sheet = 'Turnover') %>% clean_names() %>% mutate(store_name = as.factor(store_name))
+store <- read_xlsx(f, sheet = 'Store data') %>% clean_names() 
+costs <- read_xlsx(f, sheet = 'Costs') %>% clean_names() %>% mutate(costs = -costs)
+```
+
+## R Markdown
+
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r}
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
