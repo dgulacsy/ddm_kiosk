@@ -110,8 +110,13 @@ stores <- read_csv(paste0(url,"stores.csv"))
 cost <- read_csv(paste0(url,"cost.csv"))
 ```
 
-# Data Cleaning and Wrangling
-We 
+# Data Cleaning
+ 1. We converted the store_name variable which was stored as numeric value to strings. We did this in case of all 3 dataset (turnover, cost, stores).
+ 2. We converted nominal variables which were stored as numeric to factor variables to effectively use them later during potential regression modeling.  
+ 3.  We converted some variables which were stored as character but are indeed numeric.   
+ 4.  We replaced "#MISSING" values with NAs.
+ 5.  We flipped the sign of costs
+ 6.  We divided the Gross Margin and Costs variables with 10,000 to make interpretation easier.
 
 ```{r, results='hide'}
 # Data cleaning -----------------------------------------------------------
@@ -150,6 +155,13 @@ cost$costs <- cost$costs/10^5
 turnover$gm <- turnover$gm/10^5
 ```
 
+
+# Data Wrangling
+We created 3 major data tables with different aggregation level/granularity:
+1. ys - one observation represents one store for one year   
+2. ysp - one observation represents one product category for one store for one year   
+3. yspm - one observation represents one month for one product category for one store for one year   
+
 ```{r}
 # Create Year-Store Aggregated Dataset ------------------------------------
 # Aggregate data
@@ -181,6 +193,7 @@ yspm <- left_join(turnover, stores, by="store_name")
 ```
 
 # General Descriptive Statistics and Exploratory Data Analysis
+
 
 ```{r}
 # General EDA ----------------------------------------------------------------------
@@ -236,6 +249,11 @@ ggplot(ys , aes(x = costs, y = gm)) +
   facet_grid(scales = 'free', rows = . ~ year)
 ```
 
+We spotted an irregularity in the data which is very likely to be a measurement error. As it can be seen on the right-hand-side chart there is an observation with -0.57 (100K) non-COGS cost. It is unnatural for a cost to be negative.
+
+# Revenue Improvement Strategies | EDA
+
+To focus our attention to store-related patterns rather than stability in time we limited ourselves to the observation belonging to "This year". However, it is advisable to check this stability in a later phase of the analysis.  
 ```{r}
 # Select This year
 ys <- filter(ys, year=="This year")
@@ -243,32 +261,33 @@ ysp <- filter(ysp, year=="This year")
 yspm <- filter(yspm, year=="This year")
 ```
 
-# Revenue Improvement Strategies | EDA
 
 <!-- Dominik -->
 
 ## 1. Weekend Opening Hours  
+
+Our first strategic approach to increase revenue is to optimize which stores should be open on Sundays and which should not. In order to get closer to the solution for this we may want to find out whether being open on Sundays results in higher Net Margin.
 ```{r}
 # 1. Weekend Opening Hours ------------------------
 
-ggplot(ys, aes(x = round(sunday_opening_hours,1), y = gm)) +
+ggplot(ys, aes(x = round(sunday_opening_hours,1), y = nm)) +
   geom_point() +
   theme_bw() +
   geom_smooth(method="loess" , formula = y ~ x )+
-  labs( title = "Pattern of association between Gross Margin and Sunday Opening Hours",
-        y = "Gross Margin (100K)",
+  labs( title = "Pattern of association between Net Margin and Sunday Opening Hours",
+        y = "Net Margin (100K)",
         x = "Sunday Opening Hours")
 
 # Create Sunday open dummy variable
 ys$sunday_open<-as.factor(ifelse(ys$sunday_opening_hours>0,1,0))
 yspm$sunday_open<-as.factor(ifelse(yspm$sunday_opening_hours>0,1,0))
 
-gm_s <- ys %>% group_by(sunday_open) %>% 
+nm_s <- ys %>% group_by(sunday_open) %>% 
   summarise(
-    avg_gm = mean(gm)
+    avg_nm = mean(nm)
   )
 
-ggplot(gm_s, aes(fill=sunday_open, y=avg_gm, x=sunday_open)) + 
+ggplot(nm_s, aes(fill=sunday_open, y=avg_nm, x=sunday_open)) + 
   geom_bar(position="dodge", stat="identity")
 
 gm_mps<- yspm %>% group_by(product_category,month,sunday_open) %>% 
@@ -280,16 +299,34 @@ ggplot(gm_mps, aes(fill=sunday_open, y=avg_gm, x=sunday_open)) +
   geom_bar(position="dodge", stat="identity") + 
   facet_grid(product_category ~ month,scales = 'free')
 ```
+We can see based on the charts that average Net Margin is higher for stores that are open on Sundays. However we cannot be sure that this is only due to the fact that they are open on Sundays too. Stores may different in many other aspects as well. A linear multiple regression would be helpful to say more on this.
 
+On the last chart we can see that there are significant differences in the effect of being open on Sundays to GM between various product categories which effect also changes meaningfully during the year in some cases. For example there are huge differences in gambling gross margins between stores that are open during Sunday and those that are not. In addition, this difference is even bigger in some months (Nov-Dec). This is is useful to identify which stores should be open on Sundays and which should not using their revenue distribution along product categories.
 
+## 2. Potential benefits of the abolition of PUDO Services   
 
-## 2. Potential benefits of the abolition of PUDO Services  
+Our second proposed strategy considers the usage of PUDO services to boost revenue through the development of cross-sales. The ultimate goal would be to identify those stores where PUDO has a high cross-sales potential. Although 88% of the stores already offers PUDO services, in case of the rest it can be even more valuable to choose only those stores to offer this that are more likely to have a higher cross-sales. It also needs to be kept in mind that PUDO may decrease sales of other product categories. For instance, it is not advisable to have heavily-used PUDO services where gambling is intensive since both require quite much place and the staffs' time.
 ```{r}
 # 2. Potential benefits of the abolition of PUDO Services -----------------------------------------------------------
+
+# nrow(ys[ys$pudo_pos==1,])/nrow(ys)
+
 gm_p<- yspm %>% group_by(product_category,month) %>% 
   summarise(
     avg_gm = mean(gm)
   )
+
+df1<- ysp %>% filter(product_category=="PUDO") %>% rename(pudo = gm) %>% select(store_name,pudo)
+df2<- ysp %>% filter(product_category=="Sazka") %>% rename(sazka = gm) %>% select(store_name,sazka)                       
+df<- left_join(df1,df2,by="store_name")                                                                                  
+
+ggplot(df, aes(x = sazka, y = pudo)) +
+  geom_point() +
+  theme_bw() +
+  geom_smooth(method="loess" , formula = y ~ x )+
+  labs( title = "Pattern of association between PUDO and Gambling Gross Margins",
+        y = "PUDO Gross Margin (100K)",
+        x = "Gambling Gross Margin (100K)")
 
 ggplot(gm_p, aes(fill=product_category, y=avg_gm, x=product_category)) + 
   geom_bar(position="dodge", stat="identity") + 
@@ -297,6 +334,7 @@ ggplot(gm_p, aes(fill=product_category, y=avg_gm, x=product_category)) +
   theme(axis.text.x=element_blank(),
         legend.position = "none")
 ```
+We can see that 
 
 
 ## 3. Finding better product combos/mixes  
