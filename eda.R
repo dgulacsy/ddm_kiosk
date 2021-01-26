@@ -22,7 +22,6 @@ write_csv(turnover,paste0(path,"data/clean/turnover.csv"))
 write_csv(stores,paste0(path,"data/clean/stores.csv"))
 write_csv(cost,paste0(path,"data/clean/cost.csv"))
 
-
 # Data cleaning -----------------------------------------------------------
 str(stores)
 str(turnover)
@@ -87,14 +86,18 @@ yspm <- left_join(turnover, stores, by="store_name")
 
 # General EDA ----------------------------------------------------------------------
 
-stores %>%
+p1<-stores %>%
   keep(is.numeric) %>% 
   gather() %>% 
   ggplot(aes(value)) +
-  facet_wrap(~key, scales = "free") +
+  facet_wrap(~key, scales = "free",ncol = 3) +
   geom_histogram()+
   theme_bw() + 
   scale_fill_wsj()
+
+p1
+
+ggsave(p1, filename = paste0(path,"out/store_histograms.png"),height = 10, width = 5)
 
 # Descriptive statistics
 dstats<-sum_stat(stores, stores %>%
@@ -204,5 +207,4 @@ ggplot(ys, aes(x = npr, y = nm)) +
   labs( title = "Pattern of association between Gross Margin and Newspaper focus ratio",
         y = "Net Margin (100K)",
         x = "Newspaper focus ratio")
-
 

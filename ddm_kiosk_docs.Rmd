@@ -189,7 +189,7 @@ stores %>%
   keep(is.numeric) %>% 
   gather() %>% 
   ggplot(aes(value)) +
-  facet_wrap(~key, scales = "free") +
+  facet_wrap(~key, scales = "free", ncol = 4) +
   geom_histogram()+
   theme_bw() + 
   scale_fill_wsj()
@@ -226,16 +226,14 @@ suspicous <- subset(ys, costs<0)
 
 ggplot(ys , aes(x = costs, y = gm)) +
   geom_point() +
+  geom_point(data=suspicous, colour="red")+
+  geom_text(data=suspicous, label="Error?", vjust=-1, hjust=0.25, color="red")+
   theme_bw() +
   geom_smooth(method="loess" , formula = y ~ x ) +
   labs( title = "Relationship between Non-COGS Costs and Gross Margin",
         y = "Gross Margin (100K)",
         x = "Costs (100K)")+ 
   facet_grid(scales = 'free', rows = . ~ year)
-```
-
-```{r}
-ys$costs
 ```
 
 ```{r}
@@ -282,6 +280,8 @@ ggplot(gm_mps, aes(fill=sunday_open, y=avg_gm, x=sunday_open)) +
   geom_bar(position="dodge", stat="identity") + 
   facet_grid(product_category ~ month,scales = 'free')
 ```
+
+
 
 ## 2. Potential benefits of the abolition of PUDO Services  
 ```{r}
