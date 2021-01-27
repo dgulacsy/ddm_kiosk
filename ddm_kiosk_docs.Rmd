@@ -316,17 +316,20 @@ gm_p<- yspm %>% group_by(product_category,month) %>%
     avg_gm = mean(gm)
   )
 
-df1<- ysp %>% filter(product_category=="PUDO") %>% rename(pudo = gm) %>% select(store_name,pudo)
-df2<- ysp %>% filter(product_category=="Sazka") %>% rename(sazka = gm) %>% select(store_name,sazka)                       
-df<- left_join(df1,df2,by="store_name")                                                                                  
+ysp_wide <- ysp %>% 
+  select(store_name,product_category,gm) %>% 
+  spread(product_category, gm) %>% clean_names()
 
-ggplot(df, aes(x = sazka, y = pudo)) +
+ysp_wide$gm_share_pudo <- ysp_wide$pudo/(ysp_wide$fee_collection+ysp_wide$food_tobacco_and_others+ysp_wide$newspaper+ysp_wide$pudo+ysp_wide$sazka)
+ysp_wide$gm_share_sazka <- ysp_wide$sazka/(ysp_wide$fee_collection+ysp_wide$food_tobacco_and_others+ysp_wide$newspaper+ysp_wide$pudo+ysp_wide$sazka)
+
+ggplot(ysp_wide, aes(x = gm_share_pudo, y =gm_share_sazka)) +
   geom_point() +
   theme_bw() +
   geom_smooth(method="loess" , formula = y ~ x )+
   labs( title = "Pattern of association between PUDO and Gambling Gross Margins",
-        y = "PUDO Gross Margin (100K)",
-        x = "Gambling Gross Margin (100K)")
+        y = "Gambling Gross Margin Share (%)",
+        x = "PUDO Gross Margin Share (%)")
 
 ggplot(gm_p, aes(fill=product_category, y=avg_gm, x=product_category)) + 
   geom_bar(position="dodge", stat="identity") + 
