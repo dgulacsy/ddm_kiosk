@@ -256,6 +256,7 @@ We spotted an irregularity in the data which is very likely to be a measurement 
 To focus our attention to store-related patterns rather than stability in time we limited ourselves to the observation belonging to "This year". However, it is advisable to check this stability in a later phase of the analysis.  
 ```{r}
 # Select This year
+df <- ysp 
 ys <- filter(ys, year=="This year")
 ysp <- filter(ysp, year=="This year")
 yspm <- filter(yspm, year=="This year")
@@ -316,28 +317,40 @@ gm_p<- yspm %>% group_by(product_category,month) %>%
     avg_gm = mean(gm)
   )
 
-ysp_wide <- ysp %>% 
-  select(store_name,product_category,gm) %>% 
-  spread(product_category, gm) %>% clean_names()
-
-ysp_wide$gm_share_pudo <- ysp_wide$pudo/(ysp_wide$fee_collection+ysp_wide$food_tobacco_and_others+ysp_wide$newspaper+ysp_wide$pudo+ysp_wide$sazka)
-ysp_wide$gm_share_sazka <- ysp_wide$sazka/(ysp_wide$fee_collection+ysp_wide$food_tobacco_and_others+ysp_wide$newspaper+ysp_wide$pudo+ysp_wide$sazka)
-
-ggplot(ysp_wide, aes(x = gm_share_pudo, y =gm_share_sazka)) +
-  geom_point() +
-  theme_bw() +
-  geom_smooth(method="loess" , formula = y ~ x )+
-  labs( title = "Pattern of association between PUDO and Gambling Gross Margins",
-        y = "Gambling Gross Margin Share (%)",
-        x = "PUDO Gross Margin Share (%)")
-
 ggplot(gm_p, aes(fill=product_category, y=avg_gm, x=product_category)) + 
   geom_bar(position="dodge", stat="identity") + 
   facet_grid(product_category ~ month,scales = 'free')+
   theme(axis.text.x=element_blank(),
         legend.position = "none")
+
+ysp_wide_this <- df %>% filter(year=="This year") %>% 
+  select(store_name,product_category,gm) %>% 
+  spread(product_category, gm) %>% clean_names()
+ysp_wide_last <- df %>% filter(year=="Last year") %>% 
+  select(store_name,product_category,gm) %>% 
+  spread(product_category, gm) %>% clean_names()
+
+ysp_wide<-left_join(ysp_wide_this,ysp_wide_last,by="store_name")
+ysp_wide$dgm_pudo <- (ysp_wide$pudo.x-ysp_wide$pudo.y)/ysp_wide$pudo.y
+ysp_wide$dgm_fee_collection <- (ysp_wide$fee_collection.x-ysp_wide$fee_collection.y)/ysp_wide$fee_collection.y
+ysp_wide$dgm_sazka <- (ysp_wide$sazka.x-ysp_wide$sazka.y)/ysp_wide$sazka.y
+ysp_wide$dgm_newspaper <- (ysp_wide$newspaper.x-ysp_wide$newspaper.y)/ysp_wide$newspaper.y
+ysp_wide$dgm_newspaper <- (ysp_wide$newspaper.x-ysp_wide$newspaper.y)/ysp_wide$newspaper.y
+ysp_wide$dgm_food_tobacco_and_others <- (ysp_wide$food_tobacco_and_others.x-ysp_wide$food_tobacco_and_others.y)/ysp_wide$food_tobacco_and_others.y
+
+ysp_wide$gm_share_pudo <- ysp_wide$pudo.x/(ysp_wide$fee_collection.x+ysp_wide$food_tobacco_and_others.x+ysp_wide$newspaper.x+ysp_wide$pudo.x+ysp_wide$sazka.x)
+ysp_wide$gm_share_sazka <- ysp_wide$sazka.x/(ysp_wide$fee_collection.x+ysp_wide$food_tobacco_and_others.x+ysp_wide$newspaper.x+ysp_wide$pudo.x+ysp_wide$sazka.x)
+
+ggplot(ysp_wide, aes(x = dgm_pudo, y = dgm_sazka)) +
+  geom_point() +
+  theme_bw() +
+  geom_smooth(method="loess" , formula = y ~ x )+
+  labs( title = "Pattern of association between PUDO and Gambling Gross Margin Changes",
+        y = "Gambling Gross Margin YoY Change(%)",
+        x = "PUDO Gross Margin YoY Change (%)")
+
 ```
-We can see that 
+On the first graph we can see that there is significant amount of seasonality present in PUDO sales. It may help in picking the ideal date to launch a marketing campaign aimed at increasing cross-sales. On the second graph we try to explore the relationship between gambling and PUDO sales. We are interested whether there is a negative relationship between the two. In order to filter out the popularity of the stores we used relative change in Gross Margins from last year to this year. We cannot see a meaningful connection between the two but it may worth running some regression models to make sure there is no such pattern.   
 
 
 ## 3. Finding better product combos/mixes  
