@@ -1,4 +1,13 @@
 # Initialize environment --------------------------------------------------
+library(dplyr)
+library(readxl)
+library(ggplot2)
+library(ggthemes)
+library(tidyverse)
+library(janitor)
+require(scales)
+source("sum_stat.R")
+
 rm(list=ls())
 
 library(tidyverse)
@@ -33,6 +42,9 @@ turnover_mon['grouping'] <- grouping
 
 ggplot(turnover_mon, aes(year, avg_gm)) + geom_point() + facet_grid(scales = 'free', rows = vars(product_category), cols = vars(month)) + geom_line(aes(group = grouping))
 
+==== BASE ====
+rm(description)
+==== BASE ====
 
 # join all tables together for modelling
 df <- turnover %>% 
